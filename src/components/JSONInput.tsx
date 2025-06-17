@@ -14,7 +14,7 @@ const JSONInput = ({ value, onChange, isValid }: JSONInputProps) => {
       <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder='Paste your JSON here...\n\nExample:\n{\n  "name": "John",\n  "age": 30,\n  "city": "New York"\n}'
+        placeholder='Paste your JSON here...'
         className={`min-h-[400px] font-mono text-sm resize-none bg-slate-800/50 border-2 transition-colors duration-200 text-white placeholder:text-slate-400 ${
           isValid 
             ? 'border-blue-300/30 focus:border-blue-400' 
