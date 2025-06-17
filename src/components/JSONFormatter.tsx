@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,26 @@ const JSONFormatter = () => {
     
     // Fix single quotes to double quotes
     corrected = corrected.replace(/'/g, '"');
+    
+    // Add missing quotes around string values (but not for numbers, booleans, null, arrays, or objects)
+    corrected = corrected.replace(/:(\s*)([a-zA-Z_][a-zA-Z0-9_\s]*[a-zA-Z0-9_])(\s*[,}\]])/g, (match, space1, value, space2) => {
+      // Don't quote if it's a boolean, null, or number
+      if (/^(true|false|null|\d+\.?\d*)$/i.test(value.trim())) {
+        return match;
+      }
+      return `:${space1}"${value.trim()}"${space2}`;
+    });
+    
+    // Fix unquoted string values after colons (more comprehensive)
+    corrected = corrected.replace(/:(\s*)([^"\d\[\{][^,}\]]*?)(\s*[,}\]])/g, (match, space1, value, space2) => {
+      const trimmedValue = value.trim();
+      // Don't quote if it's already quoted, a boolean, null, number, array, or object
+      if (trimmedValue.startsWith('"') || trimmedValue.startsWith('[') || trimmedValue.startsWith('{') || 
+          /^(true|false|null|\d+\.?\d*)$/i.test(trimmedValue)) {
+        return match;
+      }
+      return `:${space1}"${trimmedValue}"${space2}`;
+    });
     
     // Fix common boolean/null values
     corrected = corrected.replace(/\bTrue\b/g, 'true');
