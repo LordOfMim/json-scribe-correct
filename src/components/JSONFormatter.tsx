@@ -15,44 +15,41 @@ const JSONFormatter = () => {
   const { toast } = useToast();
 
   const autoCorrectJSON = (jsonStr: string): string => {
-    let corrected = jsonStr.trim();
-    
-    // Remove trailing commas
-    corrected = corrected.replace(/,(\s*[}\]])/g, '$1');
-    
-    // Add quotes to unquoted keys
-    corrected = corrected.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
-    
-    // Fix single quotes to double quotes
-    corrected = corrected.replace(/'/g, '"');
-    
-    // Add missing quotes around string values (but not for numbers, booleans, null, arrays, or objects)
-    corrected = corrected.replace(/:(\s*)([a-zA-Z_][a-zA-Z0-9_\s]*[a-zA-Z0-9_])(\s*[,}\]])/g, (match, space1, value, space2) => {
-      // Don't quote if it's a boolean, null, or number
-      if (/^(true|false|null|\d+\.?\d*)$/i.test(value.trim())) {
-        return match;
-      }
-      return `:${space1}"${value.trim()}"${space2}`;
-    });
-    
-    // Fix unquoted string values after colons (more comprehensive)
-    corrected = corrected.replace(/:(\s*)([^"\d\[\{][^,}\]]*?)(\s*[,}\]])/g, (match, space1, value, space2) => {
-      const trimmedValue = value.trim();
-      // Don't quote if it's already quoted, a boolean, null, number, array, or object
-      if (trimmedValue.startsWith('"') || trimmedValue.startsWith('[') || trimmedValue.startsWith('{') || 
-          /^(true|false|null|\d+\.?\d*)$/i.test(trimmedValue)) {
-        return match;
-      }
-      return `:${space1}"${trimmedValue}"${space2}`;
-    });
-    
-    // Fix common boolean/null values
-    corrected = corrected.replace(/\bTrue\b/g, 'true');
-    corrected = corrected.replace(/\bFalse\b/g, 'false');
-    corrected = corrected.replace(/\bNone\b/g, 'null');
-    corrected = corrected.replace(/\bNULL\b/g, 'null');
-    
-    return corrected;
+  let corrected = jsonStr.trim();
+
+  // Remove comments (// and /* */)
+  corrected = corrected.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '');
+
+  // Remove trailing commas
+  corrected = corrected.replace(/,(\s*[}\]])/g, '$1');
+
+  // Replace single quotes with double quotes
+  corrected = corrected.replace(/'/g, '"');
+
+  // Add quotes to unquoted keys
+  corrected = corrected.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+
+  // Quote unquoted string values
+  corrected = corrected.replace(/:(\s*)([^"\[\]{},\d.\-truefalsenull][^,\]}]*)/gi, (match, space, value) => {
+    const trimmed = value.trim();
+    if (/^(true|false|null|\d+(\.\d+)?|\[.*\]|\{.*\})$/i.test(trimmed)) {
+      return match;
+    }
+    return `:${space}"${trimmed}"`;
+  });
+
+  // Fix common Python-style or invalid JSON values
+  corrected = corrected.replace(/\bTrue\b/g, 'true');
+  corrected = corrected.replace(/\bFalse\b/g, 'false');
+  corrected = corrected.replace(/\bNone\b/g, 'null');
+  corrected = corrected.replace(/\bNULL\b/g, 'null');
+
+  // Escape unescaped double quotes inside string values
+  corrected = corrected.replace(/"(.*?)(?<!\\)"/g, (match) => {
+    return match.replace(/(?<!\\)"/g, '\\"');
+  });
+
+  return corrected;
   };
 
   const validateAndFormat = useCallback((jsonStr: string) => {
