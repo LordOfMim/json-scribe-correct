@@ -14,82 +14,212 @@ const JSONFormatter = () => {
   const [error, setError] = useState('');
   const { toast } = useToast();
 
-  const autoCorrectJSON = (input: string): string => {
-  let corrected = input.trim();
-
-  // Step 1: Remove JS-style comments (optional)
-  corrected = corrected.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '');
-
-  // Step 2: Normalize Python/JS-like literals
-  corrected = corrected
-    .replace(/\bNone\b/g, 'null')
-    .replace(/\bNULL\b/g, 'null')
-    .replace(/\bTrue\b/g, 'true')
-    .replace(/\bFalse\b/g, 'false');
-
-  // Step 3: Fix unquoted keys and keys with single quotes to double quotes
-  corrected = corrected.replace(/([{,\s])'([^']*?)'\s*:/g, '$1"$2":'); // keys with single quotes
-  corrected = corrected.replace(/([{,\s])([a-zA-Z0-9_$]+)\s*:/g, '$1"$2":'); // unquoted keys
-
-  // Step 4: Fix string values quoted with single quotes to double quotes
-  corrected = corrected.replace(/:\s*'([^']*?)'(?=\s*[,}\]])/g, ': "$1"');
-
-  // Step 5: Remove trailing commas before } or ]
-  corrected = corrected.replace(/,(\s*[}\]])/g, '$1');
-
-  // Step 6: Escape inner unescaped double quotes inside strings (optional but safer)
-  // This tries to find string literals and escape any inner unescaped quotes
-  // Be careful with performance on large input
-  corrected = corrected.replace(/"(.*?)"/gs, (match) => {
-    // Remove the surrounding quotes
-    const inner = match.slice(1, -1);
-    // Escape unescaped quotes inside the string value
-    const escapedInner = inner.replace(/(?<!\\)"/g, '\\"');
-    return `"${escapedInner}"`;
-  });
-
-  // Final trim
-  return corrected.trim();
+  const autoCorrectJSON = (input) => {
+    let corrected = input.trim();
+    
+    // Step 1: Remove JS-style comments
+    corrected = corrected.replace(/\/\/.*$/gm, ''); // single line comments
+    corrected = corrected.replace(/\/\*[\s\S]*?\*\//g, ''); // multi-line comments
+    
+    // Step 2: Normalize Python/JS-like literals
+    corrected = corrected
+      .replace(/\bNone\b/g, 'null')
+      .replace(/\bNULL\b/g, 'null')
+      .replace(/\bTrue\b/g, 'true')
+      .replace(/\bFalse\b/g, 'false')
+      .replace(/\bundefined\b/g, 'null');
+    
+    // Step 3: Fix quotes more carefully using a tokenizer approach
+    corrected = fixQuotesRobust(corrected);
+    
+    // Step 4: Remove trailing commas before } or ]
+    corrected = corrected.replace(/,(\s*[}\]])/g, '$1');
+    
+    // Step 5: Fix common spacing issues
+    corrected = corrected.replace(/([{,])\s*([}\]])/g, '$1$2'); // empty objects/arrays
+    
+    return corrected.trim();
   };
 
+  const fixQuotesRobust = (str) => {
+    const result = [];
+    let i = 0;
+    const len = str.length;
+    
+    while (i < len) {
+      const char = str[i];
+      
+      if (char === "'" || char === '"') {
+        const quote = char;
+        const startPos = i;
+        i++; // Skip opening quote
+        
+        // Find the matching closing quote, handling escapes
+        let stringContent = '';
+        let escaped = false;
+        
+        while (i < len) {
+          const currentChar = str[i];
+          
+          if (escaped) {
+            stringContent += currentChar;
+            escaped = false;
+          } else if (currentChar === '\\') {
+            stringContent += currentChar;
+            escaped = true;
+          } else if (currentChar === quote) {
+            // Found closing quote
+            break;
+          } else {
+            stringContent += currentChar;
+          }
+          i++;
+        }
+        
+        // Check if this looks like a key (followed by colon)
+        const afterQuote = str.slice(i + 1).match(/^\s*:/);
+        const beforeQuote = str.slice(0, startPos).match(/[{,]\s*$/);
+        const isKey = afterQuote && beforeQuote;
+        
+        // Always use double quotes and properly escape content
+        const escapedContent = escapeForJSON(stringContent);
+        result.push('"' + escapedContent + '"');
+        
+        i++; // Skip closing quote
+      } else if (/[a-zA-Z_$]/.test(char)) {
+        // Potential unquoted key
+        const keyStart = i;
+        while (i < len && /[a-zA-Z0-9_$]/.test(str[i])) {
+          i++;
+        }
+        
+        const key = str.slice(keyStart, i);
+        const afterKey = str.slice(i).match(/^\s*:/);
+        
+        if (afterKey) {
+          // This is an unquoted key
+          result.push('"' + key + '"');
+        } else {
+          // Not a key, keep as is (might be a value like true/false/null)
+          result.push(key);
+        }
+      } else {
+        result.push(char);
+        i++;
+      }
+    }
+    
+    return result.join('');
+  };
 
-  const validateAndFormat = useCallback((jsonStr: string) => {
+  const escapeForJSON = (str) => {
+    return str
+      .replace(/\\/g, '\\\\')  // Escape backslashes first
+      .replace(/"/g, '\\"')    // Escape double quotes
+      .replace(/\n/g, '\\n')   // Escape newlines
+      .replace(/\r/g, '\\r')   // Escape carriage returns
+      .replace(/\t/g, '\\t')   // Escape tabs
+      .replace(/\f/g, '\\f')   // Escape form feeds
+      .replace(/\b/g, '\\b');  // Escape backspaces
+  };
+
+  // Enhanced validation function that provides better error messages
+  const validateAndFormatEnhanced = (jsonStr, toast) => {
     if (!jsonStr.trim()) {
-      setFormattedJSON('');
-      setIsValid(true);
-      setError('');
-      return;
+      return { formatted: '', isValid: true, error: '' };
     }
 
     try {
       // First try parsing as-is
       const parsed = JSON.parse(jsonStr);
       const formatted = JSON.stringify(parsed, null, 2);
-      setFormattedJSON(formatted);
-      setIsValid(true);
-      setError('');
+      return { formatted, isValid: true, error: '' };
     } catch (e) {
-      // Try auto-correction
-      try {
-        const corrected = autoCorrectJSON(jsonStr);
-        const parsed = JSON.parse(corrected);
-        const formatted = JSON.stringify(parsed, null, 2);
-        setFormattedJSON(formatted);
-        setIsValid(true);
-        setError('');
-        toast({
-          title: "Auto-corrected!",
-          description: "Fixed common JSON formatting issues.",
-        });
-      } catch (correctionError) {
-        setIsValid(false);
-        setError(e instanceof Error ? e.message : 'Invalid JSON');
-        setFormattedJSON('');
+      // Try auto-correction with multiple attempts
+      const attempts = [
+        () => autoCorrectJSON(jsonStr),
+        () => autoCorrectJSON(jsonStr.replace(/'/g, '"')), // Simple quote replacement as fallback
+        () => fixBrackets(autoCorrectJSON(jsonStr)), // Try fixing bracket issues
+      ];
+
+      for (let i = 0; i < attempts.length; i++) {
+        try {
+          const corrected = attempts[i]();
+          const parsed = JSON.parse(corrected);
+          const formatted = JSON.stringify(parsed, null, 2);
+          
+          toast?.({
+            title: "Auto-corrected!",
+            description: `Fixed JSON formatting issues (attempt ${i + 1}).`,
+          });
+          
+          return { formatted, isValid: true, error: '' };
+        } catch (correctionError) {
+          // Continue to next attempt
+          continue;
+        }
+      }
+      
+      // All attempts failed
+      return {
+        formatted: '',
+        isValid: false,
+        error: getHelpfulErrorMessage(e)
+      };
+    }
+  };
+
+  const getHelpfulErrorMessage = (error) => {
+    const message = error.message || 'Invalid JSON';
+    
+    if (message.includes('Unexpected token')) {
+      return `${message}. Common fixes: check for unquoted keys, trailing commas, or mixed quote types.`;
+    } else if (message.includes('Unexpected end')) {
+      return `${message}. Check for missing closing brackets or quotes.`;
+    } else if (message.includes('Unexpected string')) {
+      return `${message}. Check for missing commas between properties.`;
+    }
+    
+    return message;
+  };
+
+  const fixBrackets = (str) => {
+    // Simple bracket balancing - count and try to fix obvious issues
+    const opens = (str.match(/[{[]/g) || []).length;
+    const closes = (str.match(/[}\]]/g) || []).length;
+    
+    if (opens > closes) {
+      // Add missing closing brackets
+      const diff = opens - closes;
+      const lastChar = str.trim().slice(-1);
+      for (let i = 0; i < diff; i++) {
+        if (lastChar === '[' || str.includes('[')) {
+          str += ']';
+        } else {
+          str += '}';
+        }
       }
     }
+    
+    return str;
+  };
+
+  // Complete JSONFormatter component:
+  const JSONFormatter = () => {
+    const [inputJSON, setInputJSON] = useState('');
+    const [formattedJSON, setFormattedJSON] = useState('');
+    const [isValid, setIsValid] = useState(true);
+    const [error, setError] = useState('');
+    const { toast } = useToast();
+
+  const validateAndFormat = useCallback((jsonStr) => {
+    const result = validateAndFormatEnhanced(jsonStr, toast);
+    setFormattedJSON(result.formatted);
+    setIsValid(result.isValid);
+    setError(result.error);
   }, [toast]);
 
-  const handleInputChange = (value: string) => {
+  const handleInputChange = (value) => {
     setInputJSON(value);
     validateAndFormat(value);
   };
