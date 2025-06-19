@@ -14,35 +14,44 @@ const JSONFormatter = () => {
   const [error, setError] = useState('');
   const { toast } = useToast();
 
-  const autoCorrectJSON = (jsonStr: string): string => {
-  let corrected = jsonStr.trim();
+  const autoCorrectJSON = (input: string): string => {
+  let corrected = input.trim();
 
-  // Remove comments
+  // Step 1: Remove JS-style comments (optional)
   corrected = corrected.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '');
 
-  // Replace Python-style null/boolean
+  // Step 2: Normalize Python/JS-like literals
   corrected = corrected
     .replace(/\bNone\b/g, 'null')
     .replace(/\bNULL\b/g, 'null')
     .replace(/\bTrue\b/g, 'true')
     .replace(/\bFalse\b/g, 'false');
 
-  // Fix single quotes to double quotes (carefully, not inside already valid quoted keys/values)
-  corrected = corrected.replace(/([{,]\s*)'([^']+)'\s*:/g, '$1"$2":'); // keys
-  corrected = corrected.replace(/:\s*'([^']*)'/g, ': "$1"'); // string values
-  corrected = corrected.replace(/'([^']+)'/g, '"$1"'); // general fallback
+  // Step 3: Fix unquoted keys and keys with single quotes to double quotes
+  corrected = corrected.replace(/([{,\s])'([^']*?)'\s*:/g, '$1"$2":'); // keys with single quotes
+  corrected = corrected.replace(/([{,\s])([a-zA-Z0-9_$]+)\s*:/g, '$1"$2":'); // unquoted keys
 
-  // Remove trailing commas (in objects/arrays)
+  // Step 4: Fix string values quoted with single quotes to double quotes
+  corrected = corrected.replace(/:\s*'([^']*?)'(?=\s*[,}\]])/g, ': "$1"');
+
+  // Step 5: Remove trailing commas before } or ]
   corrected = corrected.replace(/,(\s*[}\]])/g, '$1');
 
-  // Add quotes around unquoted keys (final pass)
-  corrected = corrected.replace(/([{,]\s*)([a-zA-Z0-9_$]+)\s*:/g, '$1"$2":');
+  // Step 6: Escape inner unescaped double quotes inside strings (optional but safer)
+  // This tries to find string literals and escape any inner unescaped quotes
+  // Be careful with performance on large input
+  corrected = corrected.replace(/"(.*?)"/gs, (match) => {
+    // Remove the surrounding quotes
+    const inner = match.slice(1, -1);
+    // Escape unescaped quotes inside the string value
+    const escapedInner = inner.replace(/(?<!\\)"/g, '\\"');
+    return `"${escapedInner}"`;
+  });
 
-  // Normalize whitespace
-  corrected = corrected.replace(/\s+\n/g, '\n').trim();
+  // Final trim
+  return corrected.trim();
+  };
 
-  return corrected;
-};
 
   const validateAndFormat = useCallback((jsonStr: string) => {
     if (!jsonStr.trim()) {
