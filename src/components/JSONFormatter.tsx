@@ -21,8 +21,7 @@ const JSONFormatter = () => {
       .replace(/\n/g, '\\n')   // Escape newlines
       .replace(/\r/g, '\\r')   // Escape carriage returns
       .replace(/\t/g, '\\t')   // Escape tabs
-      .replace(/\f/g, '\\f')   // Escape form feeds
-      .replace(/\b/g, '\\b');  // Escape backspaces
+      .replace(/\f/g, '\\f');  // Escape form feeds
   };
 
   const fixQuotesRobust = (str) => {
