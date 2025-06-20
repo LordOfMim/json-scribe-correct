@@ -2,6 +2,10 @@
 
 A modern, user-friendly web app for formatting, validating, and auto-correcting JSON. Built with React, Vite, TypeScript, Tailwind CSS, and shadcn/ui components.
 
+## On Docker Hub
+
+>[lordmim/simple-json-formatter](https://hub.docker.com/r/lordmim/simple-json-formatter)
+
 ## Features
 
 - **Paste, format, and validate JSON** in real time
