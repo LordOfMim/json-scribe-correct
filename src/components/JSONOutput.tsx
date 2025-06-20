@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface JSONOutputProps {
@@ -16,12 +15,24 @@ const JSONOutput = ({ json, isValid }: JSONOutputProps) => {
       .replace(/:\s*(true|false|null)/g, ': <span class="text-purple-300">$1</span>')
       .replace(/:\s*(\d+\.?\d*)/g, ': <span class="text-yellow-300">$1</span>')
       .replace(/([{}[\]])/g, '<span class="text-gray-300">$1</span>')
-      .replace(/(".*?")\s*:/g, '<span class="text-blue-300">$1</span><span class="text-gray-400">:</span>')
-      .replace(/<span class="text-gray-400">:<\/span>\s*(".*?")/g, '<span class="text-gray-400">:</span> <span class="text-green-300">$1</span>')
-      .replace(/<span class="text-gray-400">:<\/span>\s*(true|false|null)/g, '<span class="text-gray-400">:</span> <span class="text-purple-300">$1</span>')
-      .replace(/<span class="text-gray-400">:<\/span>\s*(\d+\.?\d*)/g, '<span class="text-gray-400">:</span> <span class="text-yellow-300">$1</span>')
-      .replace(/([{}[\]])/g, '<span class="text-gray-400">$1</span>')
-      .replace(/,/g, '<span class="text-gray-400">,</span>');
+  };
+
+  const processLinesWithIndentation = (jsonStr: string): string => {
+    if (!jsonStr) return '';
+    
+    const lines = jsonStr.split('\n');
+    const processedLines = lines.map(line => {
+      // Count leading spaces to determine indentation level
+      const leadingSpaces = line.match(/^(\s*)/)?.[1] || '';
+      const indentLevel = leadingSpaces.length;
+      
+      // Create a hanging indent style for this line
+      const hangingIndentStyle = `padding-left: ${indentLevel * 0.5}rem; text-indent: -${indentLevel * 0.5}rem; margin-left: ${indentLevel * 0.5}rem;`;
+      
+      return `<div style="${hangingIndentStyle}" class="leading-relaxed">${highlightJSON(line.trim())}</div>`;
+    });
+    
+    return processedLines.join('');
   };
 
   if (!json && isValid) {
@@ -41,13 +52,13 @@ const JSONOutput = ({ json, isValid }: JSONOutputProps) => {
 
   return (
     <div className="relative">
-      <pre className="min-h-[400px] bg-slate-800/50 border-2 border-green-300/30 rounded-md p-4 overflow-auto font-mono text-sm whitespace-pre-wrap">
-        <code 
+      <div className="min-h-[400px] bg-slate-800/50 border-2 border-green-300/30 rounded-md p-4 overflow-auto font-mono text-sm">
+        <div className="text-gray-300" 
           dangerouslySetInnerHTML={{ 
-            __html: highlightJSON(json) 
+            __html: processLinesWithIndentation(json) 
           }}
         />
-      </pre>
+      </div>
       {json && (
         <div className="absolute bottom-3 right-3 text-xs text-slate-400">
           {json.split('\n').length} lines

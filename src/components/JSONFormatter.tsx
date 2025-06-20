@@ -257,7 +257,7 @@ const JSONFormatter = () => {
                 onClick={handleClear}
                 variant="outline"
                 size="sm"
-                className="border-blue-200/50 text-blue-100 hover:bg-blue-600/20"
+                className="border-blue-200/50 text-blue-600 hover:bg-blue-600/20 hover:text-blue-200"
               >
                 Clear
               </Button>
