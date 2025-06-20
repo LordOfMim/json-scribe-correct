@@ -15,7 +15,13 @@ const JSONOutput = ({ json, isValid }: JSONOutputProps) => {
       .replace(/:\s*(".*?")/g, ': <span class="text-green-300">$1</span>')
       .replace(/:\s*(true|false|null)/g, ': <span class="text-purple-300">$1</span>')
       .replace(/:\s*(\d+\.?\d*)/g, ': <span class="text-yellow-300">$1</span>')
-      .replace(/([{}[\]])/g, '<span class="text-gray-300">$1</span>');
+      .replace(/([{}[\]])/g, '<span class="text-gray-300">$1</span>')
+      .replace(/(".*?")\s*:/g, '<span class="text-blue-300">$1</span><span class="text-gray-400">:</span>')
+      .replace(/<span class="text-gray-400">:<\/span>\s*(".*?")/g, '<span class="text-gray-400">:</span> <span class="text-green-300">$1</span>')
+      .replace(/<span class="text-gray-400">:<\/span>\s*(true|false|null)/g, '<span class="text-gray-400">:</span> <span class="text-purple-300">$1</span>')
+      .replace(/<span class="text-gray-400">:<\/span>\s*(\d+\.?\d*)/g, '<span class="text-gray-400">:</span> <span class="text-yellow-300">$1</span>')
+      .replace(/([{}[\]])/g, '<span class="text-gray-400">$1</span>')
+      .replace(/,/g, '<span class="text-gray-400">,</span>');
   };
 
   if (!json && isValid) {
